@@ -27,25 +27,16 @@ a0, a1, a2, a3, a4, a5, a6     = symbols('a0:7')
 alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols('alpha0:7')
 
 ## DH Parameters
-# s = {
-#     alpha0:     0, a0:      0, d1:  0.75,
-#     alpha1: -pi/2, a1:   0.35, d2:     0, q2: q2-pi/2,
-#     alpha2:     0, a2:   1.25, d3:     0,
-#     alpha3: -pi/2, a3:    1.5, d4: -0.0056,
-#     alpha4:  pi/2, a4:      0, d5:     0,
-#     alpha5: -pi/2, a5:      0, d6:     0,
-#     alpha6:     0, a6:      0, d7: 0.303, q7: 0
-# }
-
 s = {
     alpha0:     0, a0:      0, d1:  0.75,
     alpha1: -pi/2, a1:   0.35, d2:     0, q2: q2-pi/2,
     alpha2:     0, a2:   1.25, d3:     0,
-    alpha3: -pi/2, a3: -0.054, d4:  1.50,
+    alpha3: -pi/2, a3:    1.5, d4: -0.0056,
     alpha4:  pi/2, a4:      0, d5:     0,
     alpha5: -pi/2, a5:      0, d6:     0,
     alpha6:     0, a6:      0, d7: 0.303, q7: 0
 }
+
 
 R0_3 = Matrix([
 [sin(q2 + q3)*cos(q1), cos(q1)*cos(q2 + q3), -sin(q1)],
@@ -93,87 +84,90 @@ def handle_calculate_IK(req):
     if len(req.poses) < 1:
         print "No valid poses received"
         return -1
-    else:
-        # FK code
-
-        # Extract rotation matrices from the transformation matrices
-        #
-        #
-        ###
-
-        rospy.loginfo("yayayay")
-
-        # Initialize service response
-        joint_trajectory_list = []
-        for x in xrange(0, len(req.poses)):
-            # IK code starts here
-            joint_trajectory_point = JointTrajectoryPoint()
-            
-            # Extract end-effector position and orientation from request
-            # px,py,pz = end-effector position
-            # roll, pitch, yaw = end-effector orientation
-            p_x = req.poses[x].position.x
-            p_y = req.poses[x].position.y
-            p_z = req.poses[x].position.z
-
-            (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(
-                [req.poses[x].orientation.x, req.poses[x].orientation.y,
-                    req.poses[x].orientation.z, req.poses[x].orientation.w])
-
-            ### Your IK code here
-            # Compensate for rotation discrepancy between DH parameters and Gazebo
-            R_rpy = get_Rz(yaw) * get_Ry(pitch) * get_Rx(roll) * R_corr
-            #
-            # Calculate joint angles using Geometric IK method
-            # Wrist center vectors
-            n_x, n_y, n_z = R_rpy[0, 2], R_rpy[1, 2], R_rpy[2, 2]
-
-            # end-effector length
-            l  = 0.303
-            d6 = 0
-            a3 = 0.054
-            w_x = float(p_x - (d6 + l) * n_x)
-            w_y = float(p_y - (d6 + l) * n_y)
-            w_z = float(p_z - (d6 + l) * n_z)
     
-            # angles
-            theta1 = atan2(w_y, w_x)
+    
 
-            _a = 1.504
-            _b = 1.25
-            _c = sqrt(w_x**2 + w_y**2 + (w_z-0.75)**2)
-            _d = sqrt(w_x**2 + w_y**2)
-            _ratio = (_a**2 - _b**2  - _c**2)/(2*_b*_c)
-            _alpha = acos(_ratio)
-            _beta = acos(_d / _c)
+    # Initialize service response
+    joint_trajectory_list = []
+    for x in xrange(0, len(req.poses)):
+        # IK code starts here
+        joint_trajectory_point = JointTrajectoryPoint()
+        
+        # Extract end-effector position and orientation from request
+        # px,py,pz = end-effector position
+        # roll, pitch, yaw = end-effector orientation
+        p_x = req.poses[x].position.x
+        p_y = req.poses[x].position.y
+        p_z = req.poses[x].position.z
 
-            theta2 = float(pi/2 - _alpha - _beta)
+        (roll, pitch, yaw) = tf.transformations.euler_from_quaternion([
+            req.poses[x].orientation.x, 
+            req.poses[x].orientation.y,
+            req.poses[x].orientation.z, 
+            req.poses[x].orientation.w,
+        ])
 
-            _gamma = acos((_c**2-_b**2-_a**2)/(2*_a*_b))
+        ### Your IK code here
+        # Compensate for rotation discrepancy between DH parameters and Gazebo
+        R_rpy = get_Rz(yaw) * get_Ry(pitch) * get_Rx(roll) * R_corr
+        
+        #
+        # Calculate joint angles using Geometric IK method
+        # Wrist center vectors
+        n_x, n_y, n_z = R_rpy[0, 2], R_rpy[1, 2], R_rpy[2, 2]
 
-            theta3 = pi/2 - _gamma - atan2(0.0054, 1.5)
+        # end-effector length
+        l  = 0.303
+        d6 = 0
+        a3 = 0.054
+        w_x = float(p_x - (d6 + l) * n_x)
+        w_y = float(p_y - (d6 + l) * n_y)
+        w_z = float(p_z - (d6 + l) * n_z)
+        
+        #    
+        # Angles
+        # 
+        
+        # Theta 1
+        theta1 = atan2(w_y, w_x)
 
-            R0_3_inv  = R0_3.evalf(subs={q1:theta1, q2:theta2, q3:theta3}).inv(method="LU") 
-            R3_6   = R0_3_inv * R_rpy
+        _a = 1.504
+        _b = 1.25
+        _c = sqrt(w_x**2 + w_y**2 + (w_z-0.75)**2)
+        _d = sqrt(w_x**2 + w_y**2)
+        _ratio = (_a**2 - _b**2  - _c**2)/(2*_b*_c)
+        _alpha = acos(_ratio)
+        _beta = acos(_d / _c)
 
-            R_3_6_0_2 = R3_6[0,2]
-            R_3_6_1_0 = R3_6[1,0]
-            R_3_6_1_1 = R3_6[1,1]
-            R_3_6_1_2 = R3_6[1,2]
-            R_3_6_2_2 = R3_6[0,2]
-            R_3_6_2_2 = R3_6[2,2]
+        # Theta 2
+        theta2 = float(pi/2 - _alpha - _beta)
 
-            theta4 = atan2(R_3_6_2_2, -R_3_6_0_2)
-            theta5 = atan2(sqrt(R_3_6_0_2**2+R_3_6_2_2**2), R_3_6_1_2)
-            theta6 = atan2(-R_3_6_1_1, R_3_6_1_0)
-            #
-            ###
+        # Theta 3
+        _gamma = acos((_c**2-_b**2-_a**2)/(2*_a*_b))
+        theta3 = pi/2 - _gamma - atan2(0.0054, 1.5)
 
-            # Populate response for the IK request
-            # In the next line replace theta1,theta2...,theta6 by your joint angle variables
-            joint_trajectory_point.positions = [theta1, theta2, theta3, theta4, theta5, theta6]
-            joint_trajectory_point.positions = [float(p) for p in joint_trajectory_point.positions]
-            joint_trajectory_list.append(joint_trajectory_point)
+        # Theta 4
+        R0_3_inv  = R0_3.evalf(subs={q1:theta1, q2:theta2, q3:theta3}).inv(method="LU") 
+        R3_6   = R0_3_inv * R_rpy
+
+        R_3_6_0_2 = R3_6[0,2]
+        R_3_6_1_0 = R3_6[1,0]
+        R_3_6_1_1 = R3_6[1,1]
+        R_3_6_1_2 = R3_6[1,2]
+        R_3_6_2_2 = R3_6[0,2]
+        R_3_6_2_2 = R3_6[2,2]
+
+        theta4 = atan2(R_3_6_2_2, -R_3_6_0_2)
+        
+        # Theta 5
+        theta5 = atan2(sqrt(R_3_6_0_2**2+R_3_6_2_2**2), R_3_6_1_2)
+        
+        # Theta 6
+        theta6 = atan2(-R_3_6_1_1, R_3_6_1_0)
+
+        joint_trajectory_point.positions = [theta1, theta2, theta3, theta4, theta5, theta6]
+        joint_trajectory_point.positions = [float(p) for p in joint_trajectory_point.positions]
+        joint_trajectory_list.append(joint_trajectory_point)
 
         rospy.loginfo("length of Joint Trajectory List: %s" % len(joint_trajectory_list))
         return CalculateIKResponse(joint_trajectory_list)
