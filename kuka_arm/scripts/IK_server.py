@@ -26,16 +26,30 @@ d1, d2, d3, d4, d5, d6, d6, d7 = symbols('d1:9')
 a0, a1, a2, a3, a4, a5, a6     = symbols('a0:7')
 alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols('alpha0:7')
 
+
 ## DH Parameters
 s = {
-    alpha0:     0, a0:      0, d1:  0.75,
-    alpha1: -pi/2, a1:   0.35, d2:     0, q2: q2-pi/2,
-    alpha2:     0, a2:   1.25, d3:     0,
-    alpha3: -pi/2, a3:    1.5, d4: -0.0056,
-    alpha4:  pi/2, a4:      0, d5:     0,
-    alpha5: -pi/2, a5:      0, d6:     0,
-    alpha6:     0, a6:      0, d7: 0.303, q7: 0
+    alpha0:     0, a0:      0, d1:   0.75,
+    alpha1: -pi/2, a1:   0.35, d2:      0, q2: q2-pi/2,
+    alpha2:     0, a2:   1.25, d3:      0,
+    alpha3: -pi/2, a3:    1.5, d4: -0.054,
+    alpha4:  pi/2, a4:      0, d5:      0,
+    alpha5: -pi/2, a5:      0, d6:      0,
+    alpha6:     0, a6:      0, d7:  0.303, q7: 0
 }
+
+# ??
+
+s = {
+    alpha0:     0, a0:      0, d1:   0.75,
+    alpha1: -pi/2, a1:   0.35, d2:      0, q2: q2-pi/2,
+    alpha2:     0, a2:   1.25, d3:      0,
+    alpha3: -pi/2, a3: -0.054, d4:    1.5, 
+    alpha4:  pi/2, a4:      0, d5:      0,
+    alpha5: -pi/2, a5:      0, d6:      0,
+    alpha6:     0, a6:      0, d7:  0.303, q7: 0
+}
+
 
 
 R0_3 = Matrix([
@@ -79,23 +93,24 @@ def get_Rx(angle):
         [0, sin(angle),   cos(angle), ],
     ])
 
+def limit_value(val):
+    if val > 1:
+        return 1
+    if val < -1:
+        return -1
+    return val
+
 def handle_calculate_IK(req):
+    
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
     if len(req.poses) < 1:
         print "No valid poses received"
         return -1
-    
-    
 
     # Initialize service response
     joint_trajectory_list = []
     for x in xrange(0, len(req.poses)):
-        # IK code starts here
-        joint_trajectory_point = JointTrajectoryPoint()
         
-        # Extract end-effector position and orientation from request
-        # px,py,pz = end-effector position
-        # roll, pitch, yaw = end-effector orientation
         p_x = req.poses[x].position.x
         p_y = req.poses[x].position.y
         p_z = req.poses[x].position.z
@@ -107,22 +122,20 @@ def handle_calculate_IK(req):
             req.poses[x].orientation.w,
         ])
 
-        ### Your IK code here
-        # Compensate for rotation discrepancy between DH parameters and Gazebo
-        R_rpy = get_Rz(yaw) * get_Ry(pitch) * get_Rx(roll) * R_corr
-        
-        #
-        # Calculate joint angles using Geometric IK method
-        # Wrist center vectors
-        n_x, n_y, n_z = R_rpy[0, 2], R_rpy[1, 2], R_rpy[2, 2]
+        ## IK
+        T_rpy = get_Rz(yaw) * get_Ry(pitch) * get_Rx(roll) * R_corr
+        R_rpy = Matrix(T_rpy[0:3,0:3])
 
-        # end-effector length
-        l  = 0.303
-        d6 = 0
-        a3 = 0.054
-        w_x = float(p_x - (d6 + l) * n_x)
-        w_y = float(p_y - (d6 + l) * n_y)
-        w_z = float(p_z - (d6 + l) * n_z)
+        n_x = R_rpy[0, 2]
+        n_y = R_rpy[1, 2]
+        n_z = R_rpy[2, 2]
+
+        R_rpy = get_Rz(yaw) * get_Ry(pitch) * get_Rx(roll) * R_corr
+        n_x, n_y, n_z = R_rpy[0, 2], R_rpy[1, 2], R_rpy[2, 2]
+        
+        w_x = float(p_x - (s[d6] + s[d7]) * n_x)
+        w_y = float(p_y - (s[d6] + s[d7]) * n_y)
+        w_z = float(p_z - (s[d6] + s[d7]) * n_z)
         
         #    
         # Angles
@@ -131,46 +144,41 @@ def handle_calculate_IK(req):
         # Theta 1
         theta1 = atan2(w_y, w_x)
 
-        _a = 1.504
-        _b = 1.25
-        _c = sqrt(w_x**2 + w_y**2 + (w_z-0.75)**2)
-        _d = sqrt(w_x**2 + w_y**2)
-        _ratio = (_a**2 - _b**2  - _c**2)/(2*_b*_c)
-        _alpha = acos(_ratio)
-        _beta = acos(_d / _c)
-
         # Theta 2
+        _A = 1.5
+        _C = s[a2]
+        _B = sqrt(w_x**2 + w_y**2 + (w_z-s[d1])**2)
+        _alpha = acos((_A**2 - _C**2 - _B**2) / (-2*_A*_B))
+        _D = sqrt(w_x**2 + w_y**2)
+        _K = w_z - s[d1]
+        _beta = acos(_D / _B)
+
         theta2 = float(pi/2 - _alpha - _beta)
 
         # Theta 3
-        _gamma = acos((_c**2-_b**2-_a**2)/(2*_a*_b))
+        _gamma = acos((_B**2-_C**2-_A**2)/(-2*_A*_C))
         theta3 = pi/2 - _gamma - atan2(0.0054, 1.5)
 
         # Theta 4
         R0_3_inv  = R0_3.evalf(subs={q1:theta1, q2:theta2, q3:theta3}).inv(method="LU") 
         R3_6   = R0_3_inv * R_rpy
 
-        R_3_6_0_2 = R3_6[0,2]
-        R_3_6_1_0 = R3_6[1,0]
-        R_3_6_1_1 = R3_6[1,1]
-        R_3_6_1_2 = R3_6[1,2]
-        R_3_6_2_2 = R3_6[0,2]
-        R_3_6_2_2 = R3_6[2,2]
-
-        theta4 = atan2(R_3_6_2_2, -R_3_6_0_2)
+        theta4 = atan2(R3_6[2,2], -R3_6[0,2])
         
         # Theta 5
-        theta5 = atan2(sqrt(R_3_6_0_2**2+R_3_6_2_2**2), R_3_6_1_2)
+        theta5 = atan2(sqrt(R3_6[0,2]**2+R3_6[2,2]**2), R3_6[1,2])
         
         # Theta 6
-        theta6 = atan2(-R_3_6_1_1, R_3_6_1_0)
+        theta6 = atan2(-R3_6[1,1], R3_6[1,0])
 
+
+        joint_trajectory_point = JointTrajectoryPoint()
         joint_trajectory_point.positions = [theta1, theta2, theta3, theta4, theta5, theta6]
         joint_trajectory_point.positions = [float(p) for p in joint_trajectory_point.positions]
         joint_trajectory_list.append(joint_trajectory_point)
 
-        rospy.loginfo("length of Joint Trajectory List: %s" % len(joint_trajectory_list))
-        return CalculateIKResponse(joint_trajectory_list)
+    rospy.loginfo("length of Joint Trajectory List: %s" % len(joint_trajectory_list))
+    return CalculateIKResponse(joint_trajectory_list)
 
 
 def IK_server():

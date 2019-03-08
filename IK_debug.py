@@ -25,7 +25,6 @@ test_cases = {1:[[[2.16135,-1.42635,1.55109],
               5:[]}
 
 
-# FK
 
 ## Symbols
 q1, q2, q3, q4, q5, q6, q6, q7 = symbols('q1:9')
@@ -44,94 +43,67 @@ s = {
     alpha6:     0, a6:      0, d7: 0.303, q7: 0
 }
 
+# FK
+
+## Symbols
+q1, q2, q3, q4, q5, q6, q6, q7 = symbols('q1:9')
+d1, d2, d3, d4, d5, d6, d6, d7 = symbols('d1:9')
+a0, a1, a2, a3, a4, a5, a6     = symbols('a0:7')
+alpha0, alpha1, alpha2, alpha3, alpha4, alpha5, alpha6 = symbols('alpha0:7')
+
+## DH Parameters
 s = {
-    alpha0:     0, a0:      0, d1:  0.75,
-    alpha1: -pi/2, a1:   0.35, d2:     0, q2: q2-pi/2,
-    alpha2:     0, a2:   1.25, d3:     0,
-    alpha3: -pi/2, a3: -0.054, d4:  1.50,
-    alpha4:  pi/2, a4:      0, d5:     0,
-    alpha5: -pi/2, a5:      0, d6:     0,
-    alpha6:     0, a6:      0, d7: 0.303, q7: 0
+    alpha0:     0, a0:      0, d1:   0.75,
+    alpha1: -pi/2, a1:   0.35, d2:      0, q2: q2-pi/2,
+    alpha2:     0, a2:   1.25, d3:      0,
+    alpha3: -pi/2, a3: -0.054, d4:    1.5, 
+    alpha4:  pi/2, a4:      0, d5:      0,
+    alpha5: -pi/2, a5:      0, d6:      0,
+    alpha6:     0, a6:      0, d7:  0.303, q7: 0
 }
 
-## Homogenous Transforms
-T0_1 = Matrix([
-    [ cos(q1),                        -sin(q1),            0,              a0 ],
-    [ sin(q1)*cos(alpha0), cos(q1)*cos(alpha0), -sin(alpha0), -sin(alpha0)*d1 ],
-    [ sin(q1)*sin(alpha0), cos(q1)*sin(alpha0),  cos(alpha0),  cos(alpha0)*d1 ],
-    [                   0,                   0,            0,               1 ],
-])
-R0_1 = T0_1.subs(s)[0:3, 0:3]
 
-T1_2 = Matrix([
-    [ cos(q2),                        -sin(q2),            0,              a1 ],
-    [ sin(q2)*cos(alpha1), cos(q2)*cos(alpha1), -sin(alpha1), -sin(alpha1)*d2 ],
-    [ sin(q2)*sin(alpha1), cos(q2)*sin(alpha1),  cos(alpha1),  cos(alpha1)*d2 ],
-    [                   0,                   0,            0,               1 ],
-])
-R1_2 = T1_2.subs(s)[0:3, 0:3]
-
-T2_3 = Matrix([
-    [ cos(q3),                        -sin(q3),            0,              a2 ],
-    [ sin(q3)*cos(alpha2), cos(q3)*cos(alpha2), -sin(alpha2), -sin(alpha2)*d3 ],
-    [ sin(q3)*sin(alpha2), cos(q3)*sin(alpha2),  cos(alpha2),  cos(alpha2)*d3 ],
-    [                   0,                   0,            0,               1 ],
-])
-R2_3 = T2_3.subs(s)[0:3, 0:3]
-
-## Composition of homogenous transforms
-R0_1 = simplify(R0_1)        # base_link
-R0_2 = simplify(R0_1 * R1_2) # base_link to link_2
 R0_3 = Matrix([
 [sin(q2 + q3)*cos(q1), cos(q1)*cos(q2 + q3), -sin(q1)],
 [sin(q1)*sin(q2 + q3), sin(q1)*cos(q2 + q3),  cos(q1)],
 [        cos(q2 + q3),        -sin(q2 + q3),        0]])
 
 
-# print(R0_3)
-
 ## Correction to account orientation difference between definition of 
 ## gripper_link in URDF vs DH Convention
 R_z = Matrix([
-    [cos(pi), -sin(pi), 0, 0],
-    [sin(pi),  cos(pi), 0, 0],
-    [      0,        0, 1, 0],
-    [      0,        0, 0, 1],
+    [cos(pi), -sin(pi), 0],
+    [sin(pi),  cos(pi), 0],
+    [      0,        0, 1],
 ])
 R_y = Matrix([
-    [ cos(-pi/2),  0, sin(-pi/2), 0],
-    [          0,  1,          0, 0],
-    [-sin(-pi/2),  0, cos(-pi/2), 0],
-    [          0,  0,          0, 1],
+    [ cos(-pi/2),  0, sin(-pi/2)],
+    [          0,  1,          0],
+    [-sin(-pi/2),  0, cos(-pi/2)],
 ])
-R_corr = R_z * R_y
-
-print(R_corr)
-
+R_corr = simplify(R_z * R_y)
 
 def get_Rz(angle): 
     return Matrix([
-        [cos(angle), -sin(angle), 0, 0],
-        [sin(angle),  cos(angle), 0, 0],
-        [         0,           0, 1, 0],
-        [         0,           0, 1, 1],
+        [cos(angle), -sin(angle), 0, ],
+        [sin(angle),  cos(angle), 0, ],
+        [         0,           0, 1, ],
     ])
 
 def get_Ry(angle): 
     return Matrix([
-        [ cos(angle),  0, sin(angle), 0],
-        [          0,  1,          0, 0],
-        [-sin(angle),  0, cos(angle), 0],
-        [          0,  0,          0, 1],
+        [ cos(angle),  0, sin(angle), ],
+        [          0,  1,          0, ],
+        [-sin(angle),  0, cos(angle), ],
     ])
 
 def get_Rx(angle): 
     return Matrix([
-        [1,          0,            0, 0],
-        [0, cos(angle),  -sin(angle), 0],
-        [0, sin(angle),   cos(angle), 0],
-        [          0,  0,          0, 1],
+        [1,          0,            0, ],
+        [0, cos(angle),  -sin(angle), ],
+        [0, sin(angle),   cos(angle), ],
     ])
+
 
 def step_fk():
     # Symbols for joint variables
@@ -278,8 +250,6 @@ def test_code(test_case):
     ########################################################################################
     ## 
 
-    
-
     p_x, p_y, p_z = test_case[0][0][0], test_case[0][0][1], test_case[0][0][2]
 
     (roll, pitch, yaw) = tf.transformations.euler_from_quaternion([
@@ -297,47 +267,47 @@ def test_code(test_case):
     n_y = R_rpy[1, 2]
     n_z = R_rpy[2, 2]
 
+    R_rpy = get_Rz(yaw) * get_Ry(pitch) * get_Rx(roll) * R_corr
+    n_x, n_y, n_z = R_rpy[0, 2], R_rpy[1, 2], R_rpy[2, 2]
     
-
-    # end-effector length
-    l  = 0.303
-    d6 = 0
-    a3 = 0.054
-
-    w_x = float(p_x - (d6 + l) * n_x)
-    w_y = float(p_y - (d6 + l) * n_y)
-    w_z = float(p_z - (d6 + l) * n_z)
+    w_x = float(p_x - (s[d6] + s[d7]) * n_x)
+    w_y = float(p_y - (s[d6] + s[d7]) * n_y)
+    w_z = float(p_z - (s[d6] + s[d7]) * n_z)
     
-    # angles
+    #    
+    # Angles
+    # 
+    
+    # Theta 1
     theta1 = atan2(w_y, w_x)
 
-    _a = 1.504
-    _b = 1.25
-    _c = sqrt(w_x**2 + w_y**2 + (w_z-0.75)**2)
-    _d = sqrt(w_x**2 + w_y**2)
-    _ratio = (_a**2 - _b**2  - _c**2)/(2*_b*_c)
-    _alpha = acos(_ratio)
-    _beta = acos(_d / _c)
+    # Theta 2
+    _A = 1.5
+    _C = s[a2]
+    _B = sqrt(w_x**2 + w_y**2 + (w_z-s[d1])**2)
+    _alpha = acos((_A**2 - _C**2 - _B**2) / (-2*_A*_B))
+    _D = sqrt(w_x**2 + w_y**2)
+    _K = w_z - s[d1]
+    _beta = acos(_D / _B)
 
     theta2 = float(pi/2 - _alpha - _beta)
 
-    _gamma = acos((_c**2-_b**2-_a**2)/(2*_a*_b))
-
+    # Theta 3
+    _gamma = acos((_B**2-_C**2-_A**2)/(-2*_A*_C))
     theta3 = pi/2 - _gamma - atan2(0.0054, 1.5)
 
+    # Theta 4
     R0_3_inv  = R0_3.evalf(subs={q1:theta1, q2:theta2, q3:theta3}).inv(method="LU") 
     R3_6   = R0_3_inv * R_rpy
 
-    R_3_6_0_2 = R3_6[0,2]
-    R_3_6_1_0 = R3_6[1,0]
-    R_3_6_1_1 = R3_6[1,1]
-    R_3_6_1_2 = R3_6[1,2]
-    R_3_6_2_2 = R3_6[0,2]
-    R_3_6_2_2 = R3_6[2,2]
+    theta4 = atan2(R3_6[2,2], -R3_6[0,2])
     
-    theta4 = atan2(R_3_6_2_2, -R_3_6_0_2)
-    theta5 = atan2(sqrt(R_3_6_0_2**2+R_3_6_2_2**2), R_3_6_1_2)
-    theta6 = atan2(-R_3_6_1_1, R_3_6_1_0)
+    # Theta 5
+    theta5 = atan2(sqrt(R3_6[0,2]**2+R3_6[2,2]**2), R3_6[1,2])
+    
+    # Theta 6
+    theta6 = atan2(-R3_6[1,1], R3_6[1,0])
+
 
     ## 
     ########################################################################################
@@ -349,6 +319,7 @@ def test_code(test_case):
     ## (OPTIONAL) YOUR CODE HERE!
 
     print("calculating fk")
+
 
     T_total = step_fk()
 
@@ -417,6 +388,6 @@ def test_code(test_case):
 
 if __name__ == "__main__":
     # Change test case number for different scenarios
-    test_case_number = 1
+    test_case_number = 3
 
     test_code(test_cases[test_case_number])
